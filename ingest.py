@@ -57,7 +57,6 @@ container_client = blob_service_client.get_container_client(
     os.getenv("BLOB_CONTAINER_NAME")
 )
 
-
 # -----------------------------
 # Read Documents from Blob Storage
 # -----------------------------
@@ -68,9 +67,7 @@ def read_documents():
 
     print("\nReading documents from Azure Blob Storage...\n")
 
-    blobs = container_client.list_blobs()
-
-    for blob in blobs:
+    for blob in container_client.list_blobs():
 
         print(f"Downloading : {blob.name}")
 
@@ -80,7 +77,7 @@ def read_documents():
 
         documents.append(
             {
-                "source": blob.name,
+                "filename": blob.name,
                 "content": content
             }
         )
@@ -154,7 +151,7 @@ def main():
             {
                 "id": str(i),
                 "content": chunk["content"],
-                "source": chunk["source"],
+                "source": chunk["filename"],
                 "embedding": embedding
             }
         )
