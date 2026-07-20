@@ -1,22 +1,31 @@
-
 """
 ingest.py
 
 Reads documents from the data folder,
 creates chunks,
-generates embeddings using Azure OpenAI.
+generates embeddings using Azure OpenAI,
+uploads them to Azure AI Search.
 """
 
 import os
 from dotenv import load_dotenv
 from openai import AzureOpenAI
 
+from azure.core.credentials import AzureKeyCredential
+from azure.search.documents import SearchClient
+
 from utils import read_documents, prepare_chunks
 
-# Load environment variables
+# -----------------------------
+# Load Environment Variables
+# -----------------------------
+
 load_dotenv()
 
+# -----------------------------
 # Azure OpenAI Client
+# -----------------------------
+
 client = AzureOpenAI(
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
     api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
@@ -25,10 +34,20 @@ client = AzureOpenAI(
 
 EMBEDDING_MODEL = os.getenv("EMBEDDING_DEPLOYMENT")
 
+# -----------------------------
+# Azure AI Search Client
+# -----------------------------
+
+search_client = SearchClient(
+    endpoint=os.getenv("SEARCH_ENDPOINT"),
+    index_name=os.getenv("SEARCH_INDEX"),
+    credential=AzureKeyCredential(os.getenv("SEARCH_API_KEY"))
+)
+
 
 def generate_embedding(text):
     """
-    Generate an embedding for the given text.
+    Generate embedding using Azure OpenAI
     """
 
     response = client.embeddings.create(
@@ -39,11 +58,32 @@ def generate_embedding(text):
     return response.data[0].embedding
 
 
-def main():
+def upload_documents(documents):
+    """
+    Upload documents to Azure AI Search
+    """
+
+    print("\nUploading documents to Azure AI Search...\n")
+
+    result = search_client.upload_documents(documents)
+
+    success = 0
+
+    for item in result:
+
+        if item.succeeded:
+            success += 1
 
     print("=" * 50)
-    print("Loading Documents...")
+    print(f"Uploaded {success}/{len(documents)} documents")
     print("=" * 50)
+
+
+def main():
+
+    print("=" * 60)
+    print("Loading Documents")
+    print("=" * 60)
 
     documents = read_documents("data")
 
@@ -53,33 +93,30 @@ def main():
 
     print(f"Chunks Created : {len(chunks)}")
 
-    print("\nGenerating Embeddings...\n")
-
     embedded_chunks = []
+
+    print("\nGenerating Embeddings...\n")
 
     for i, chunk in enumerate(chunks):
 
-        vector = generate_embedding(chunk["content"])
+        embedding = generate_embedding(chunk["content"])
 
-        embedded_chunks.append({
-            "id": str(i),
-            "source": chunk["source"],
-            "content": chunk["content"],
-            "embedding": vector
-        })
+        embedded_chunks.append(
+            {
+                "id": str(i),
+                "content": chunk["content"],
+                "source": chunk["source"],
+                "embedding": embedding
+            }
+        )
 
-        print(f"Processed Chunk {i + 1}/{len(chunks)}")
+        print(f"Processed Chunk {i+1}/{len(chunks)}")
 
-    print("\nCompleted Successfully!")
+    print("\nEmbedding Generation Completed")
 
-    print(f"Total Embedded Chunks : {len(embedded_chunks)}")
+    upload_documents(embedded_chunks)
 
-    # Display one sample
-    print("\nSample Record:")
-    print("----------------------")
-    print("Source :", embedded_chunks[0]["source"])
-    print("Content:", embedded_chunks[0]["content"][:100], "...")
-    print("Embedding Length:", len(embedded_chunks[0]["embedding"]))
+    print("\nCompleted Successfully")
 
 
 if __name__ == "__main__":
