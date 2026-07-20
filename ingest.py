@@ -1,7 +1,7 @@
 """
 ingest.py
 
-Reads documents from the data folder,
+Reads documents from Azure Blob Storage,
 creates chunks,
 generates embeddings using Azure OpenAI,
 uploads them to Azure AI Search.
@@ -13,8 +13,9 @@ from openai import AzureOpenAI
 
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
+from azure.storage.blob import BlobServiceClient
 
-from utils import read_documents, prepare_chunks
+from utils import prepare_chunks
 
 # -----------------------------
 # Load Environment Variables
@@ -44,11 +45,54 @@ search_client = SearchClient(
     credential=AzureKeyCredential(os.getenv("SEARCH_API_KEY"))
 )
 
+# -----------------------------
+# Azure Blob Storage Client
+# -----------------------------
+
+blob_service_client = BlobServiceClient.from_connection_string(
+    os.getenv("AZURE_STORAGE_CONNECTION_STRING")
+)
+
+container_client = blob_service_client.get_container_client(
+    os.getenv("BLOB_CONTAINER_NAME")
+)
+
+
+# -----------------------------
+# Read Documents from Blob Storage
+# -----------------------------
+
+def read_documents():
+
+    documents = []
+
+    print("\nReading documents from Azure Blob Storage...\n")
+
+    blobs = container_client.list_blobs()
+
+    for blob in blobs:
+
+        print(f"Downloading : {blob.name}")
+
+        blob_client = container_client.get_blob_client(blob.name)
+
+        content = blob_client.download_blob().readall().decode("utf-8")
+
+        documents.append(
+            {
+                "source": blob.name,
+                "content": content
+            }
+        )
+
+    return documents
+
+
+# -----------------------------
+# Generate Embedding
+# -----------------------------
 
 def generate_embedding(text):
-    """
-    Generate embedding using Azure OpenAI
-    """
 
     response = client.embeddings.create(
         model=EMBEDDING_MODEL,
@@ -58,10 +102,11 @@ def generate_embedding(text):
     return response.data[0].embedding
 
 
+# -----------------------------
+# Upload Documents
+# -----------------------------
+
 def upload_documents(documents):
-    """
-    Upload documents to Azure AI Search
-    """
 
     print("\nUploading documents to Azure AI Search...\n")
 
@@ -79,13 +124,17 @@ def upload_documents(documents):
     print("=" * 50)
 
 
+# -----------------------------
+# Main
+# -----------------------------
+
 def main():
 
     print("=" * 60)
     print("Loading Documents")
     print("=" * 60)
 
-    documents = read_documents("data")
+    documents = read_documents()
 
     print(f"Documents Loaded : {len(documents)}")
 
