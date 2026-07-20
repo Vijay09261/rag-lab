@@ -1,94 +1,62 @@
 """
 utils.py
 
-Utility functions for the RAG application.
-Responsible for:
-1. Reading text files
-2. Chunking documents
+Utility functions for reading and chunking documents.
 """
 
 import os
 
 
-def read_documents(folder_path: str):
-    """
-    Reads all .txt files from the given folder.
+# -----------------------------
+# Read Local Documents (Optional)
+# -----------------------------
 
-    Returns:
-        List of dictionaries
-        [
-            {
-                "filename": "...",
-                "content": "..."
-            }
-        ]
-    """
+def read_documents(folder_path):
 
     documents = []
 
-    for file in os.listdir(folder_path):
+    for filename in os.listdir(folder_path):
 
-        if file.endswith(".txt"):
+        if filename.endswith(".txt"):
 
-            path = os.path.join(folder_path, file)
-
-            with open(path, "r", encoding="utf-8") as f:
-
-                text = f.read()
+            with open(
+                os.path.join(folder_path, filename),
+                "r",
+                encoding="utf-8"
+            ) as file:
 
                 documents.append(
                     {
-                        "filename": file,
-                        "content": text
+                        "filename": filename,
+                        "content": file.read()
                     }
                 )
 
     return documents
 
 
-def chunk_text(text: str, chunk_size=500, overlap=100):
-    """
-    Splits text into overlapping chunks.
+# -----------------------------
+# Chunk Text
+# -----------------------------
 
-    Example
-
-    Chunk 1 : 0 - 500
-
-    Chunk 2 : 400 - 900
-
-    Chunk 3 : 800 - 1300
-    """
+def chunk_text(text, chunk_size=500):
 
     chunks = []
 
-    start = 0
+    for i in range(0, len(text), chunk_size):
 
-    while start < len(text):
-
-        end = start + chunk_size
-
-        chunks.append(text[start:end])
-
-        start += (chunk_size - overlap)
+        chunks.append(text[i:i + chunk_size])
 
     return chunks
 
 
+# -----------------------------
+# Prepare Chunks
+# -----------------------------
+
 def prepare_chunks(documents):
-    """
-    Converts every document into chunks.
 
-    Returns
-
-    [
-        {
-            "source":"CompanyPolicy.txt",
-            "chunk":"Office Timing..."
-        }
-    ]
-    """
-
-    all_chunks = []
+    prepared_chunks = []
 
     for document in documents:
 
@@ -96,26 +64,11 @@ def prepare_chunks(documents):
 
         for chunk in chunks:
 
-            all_chunks.append(
+            prepared_chunks.append(
                 {
-                    "source": document["filename"],
+                    "filename": document["filename"],
                     "content": chunk
                 }
             )
 
-    return all_chunks
-
-
-if __name__ == "__main__":
-
-    docs = read_documents("data")
-
-    print(f"Documents Loaded : {len(docs)}")
-
-    chunks = prepare_chunks(docs)
-
-    print(f"Chunks Created : {len(chunks)}")
-
-    print()
-
-    print(chunks[0])
+    return prepared_chunks
